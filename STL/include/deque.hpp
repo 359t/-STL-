@@ -45,7 +45,7 @@ public:
 
     //尾插和尾删//头插和头删
     void push_back(const T&val);
-    void push_bach(T&& val);
+    void push_back(T&& val);
     void pop_back();
     void push_front( const T&val);
     void push_front(T&& val);
@@ -95,6 +95,7 @@ private:
     void allocate_blocks(size_t start, size_t end);
     void destroy_elements();
     void deallocate_blocks(size_t start, size_t end);
+    void reallocate_map(size_t new_map_size);
     
     //内部迭代器位置计算
     iterator internal_begin();
@@ -754,6 +755,64 @@ void deque<T>::push_back(const T&val){
         return;
     }
     //插入新元素；
+    size_t total_pos = m_start_index + m_size;
+    size_t block_idx = m_start_block + total_pos / BLOCK_SIZE;
+    size_t pos_in_block = total_pos% BLOCK_SIZE;
+
+    //检查是否需要新块
+    if (pos_in_block == 0){
+
+        if(block_idx >= m_map_size){
+            size_t new_size = m_map_size;
+            while (new_size <= block_idx + 2){
+                new_size *=2;
+            }
+            reallocate_map(new_size);
+
+            total_pos = m_start_index + m_size;
+            block_idx = m_start_block + total_pos / BLOCK_SIZE;
+            pos_in_block = total_pos % BLOCK_SIZE;
+        }
+        
+        if (m_map[block_idx] ==nullptr){
+            m_map[block_idx] =reinterpret_cast<T*>(new char[BLOCK_SIZE * sizeof(T)]);
+        }
+    }
+
+    new (m_map[block_idx] + pos_in_block) T(val);
+    m_size++;
+}
+
+template <class T>
+void deque<T>::push_back(T&& val){
+    if(empty()){
+        new (m_map[m_start_block] + m_start_index) T(std::move(val));
+        m_size = 1;
+        return;
+    }   
+    size_t next_position = m_start_index + m_size;
+    size_t block_index = m_start_block + next_position / BLOCK_SIZE;
+    size_t position_in_block = next_position % BLOCK_SIZE;
+
+    if(position_in_block >= m_map_size) {
+
+        size_t new_map_size = m_map_size * 2;
+        while (new_map_size <= block_index + 2){
+            new_map_size *= 2;
+        }
+        reallocate_map(new_map_size);
+
+        next_position = m_start_index + m_size;
+        block_index = m_start_block + next_position / BLOCK_SIZE;
+        position_in_block = next_position%BLOCK_SIZE;
+    }
+    if (m_map[block_index] == nullptr){
+        m_map[block_index] = reinterpret_cast<T*>(
+            new char[BLOCK_SIZE * sizeof(T)]);
+    }
+    new(m_map[block_index] == nullptr){
+        m_map[block_index] = reinterpret_cast<T*>(new char[BLOCK_SIZE * sizeof(T)]);
+    }
 }
 
 template<class T>
@@ -829,3 +888,42 @@ void deque<T>::deallocate_blocks(size_t start_block, size_t end_block) {
         }
     }
 } 
+
+template<class T>
+void deque<T>::reallocate_map(size_t new_map_size){
+    if (new_map_size <= m_map_size){
+        return;
+    }
+
+    T** new_map = reinterpret_cast<T**>(new char[new_map_size * sizeof(T*)]);
+
+    for (size_t i = 0; i < new_map_size; ++i){
+        new_map[i] = nullptr;
+    }
+
+    size_t blocks_used = 0;
+    if(m_size > 0){
+
+        size_t first_used_block = m_start_block;
+        size_t total_positions = m_start_index + m_size;
+        size_t last_used_block = m_start_block + (total_positions - 1) / BLOCK_SIZE;
+
+        for (size_t i = first_used_block; i <= last_used_block; ++i){
+            if(i < m_map_size && m_map[i] != nullptr){
+                new_map[new_start_block + (i - first_used_block)] = m_map[i];
+            }
+        }
+
+        m_start_block = new_start_block;
+    }
+    else{
+        m_start_block = new_map_size / 2;
+        m_start_index = 0;
+    }
+    if(m_map){
+        delete[] reinterpret_cast<char*>(m_map);
+    }
+
+    m_map = new_map;
+    m_map_size = new_map_size;
+}
