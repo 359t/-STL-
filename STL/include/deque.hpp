@@ -1,6 +1,9 @@
 #pragma once
 #include<iostream>
 #include <stdexcept>
+#include <initializer_list>
+#include <utility>
+#include <algorithm>
 
 
 template <class T>
@@ -224,7 +227,7 @@ public:
     }
     iterator operator-(difference_type n)const{
         iterator tmp = *this;
-        tmp += n;
+        tmp -= n;
         return tmp;
     }
     friend iterator operator+(difference_type n, const iterator& it){
@@ -250,7 +253,7 @@ public:
         if(m_current_block == other.m_current_block){
             return m_current < other.m_current;
         }
-        renturn m_current_block < other.m_current_block;
+        return m_current_block < other.m_current_block;
     }
     bool operator >(const iterator& other) const{
         return other < *this;
@@ -402,7 +405,7 @@ public:
         if(m_current_block == other.m_current_block){
             return m_current < other.m_current;
         }
-        renturn m_current_block < other.m_current_block;
+        return m_current_block < other.m_current_block;
     }
     bool operator >(const const_iterator& other) const{
         return other < *this;
@@ -514,7 +517,7 @@ deque<T>::deque (const deque<T>& other){
         if (m_start_index > 0 && needed_blocks >1){
             last_used_block++;
         }
-        for (size_t = first_used_block; i<= last_used_block; ++i){
+        for (size_t i = first_used_block; i<= last_used_block; ++i){
             if(other.m_map[i]){
                 m_map[i] = reinterpret_cast<T*>(new char[BLOCK_SIZE * sizeof(T)]);
             }
@@ -652,7 +655,7 @@ deque<T>& deque<T>::operator=(deque<T>&& other)noexcept{
     }
     m_map = other.m_mapp;
     m_map_size = other.m_map_size;
-    m_star_index = other.m_start_index;
+    m_start_index = other.m_start_index;
     m_size = other.m_size;
 
     other.m_map = nullptr;
@@ -887,6 +890,76 @@ void deque<T>:: push_front( const T&val){
     m_size++;
 }
 
+template <class T>
+void deque<T>:: push_front(T&& val){
+
+    if(m_map == nullptr){
+        m_map = new T*[MAP_INIT_SIZE];
+        m_map_size = MAP_INIT_SIZE;
+        m_start_block = MAP_INIT_SIZE/2;
+        m_map[m_start_block] = allocate_block();
+        m_start_index = BLOCK_SIZE / 2;
+        m_size = 0;
+    }
+
+    if(m_start_index == 0){
+        if(m_start_block == 0){
+
+            size_t new_map_size = m_map_size * 2;
+            T** new_map = new T*[new_map_size];
+
+            size_t offset = new_map_size -m_map_size;
+            for (size_t i = 0; i < m_map_size; ++i) {
+                new_map[offset + i] = m_map[i];
+            }
+
+            delete[] m_map;
+            m_map = new_map;
+            m_map_size = new_map_size;
+            m_start_block = offset;
+        }
+
+        --m_start_block;
+        m_map[m_start_block] = allocate_block();
+        m_start_index = BLOCK_SIZE;
+    }
+
+    --m_start_index;
+    m_map[m_start_block][m_start_index] = std::move(val);
+    ++m_size;
+}
+
+template <class T>
+void deque<T>::pop_front(){
+    if (empty()) {
+        throw std::out_of_range("deque::pop_front: deque is empty");
+    }
+
+    T* first_element = m_map[m_start_block] + m_start_index;
+    first_element->~T();
+
+    --m_size;
+
+    if (m_size == 0){
+        m_start_index = BLOCK_SIZE /2;
+    }else{
+        ++m_start_index;
+        
+        if(m_start_index == BLOCK_SIZE){
+
+            T* empty_block = m_map[m_start_block];
+
+            m_start_index = 0;
+            ++m_start_block;
+
+            if(should_release_block(m_start_block - 1)){
+                deallocate_block(empty_block);
+                m_map[m_start_block - 1] = nullptr;
+            }
+        }
+    }
+}
+
 template<class T>
 typename deque<T>::iterator deque<T>::begin(){
     if(empty()){
@@ -898,9 +971,9 @@ typename deque<T>::iterator deque<T>::begin(){
 template<class T>
 typename deque<T>::iterator deque<T>::end(){
     if(empty()){
-        return iterator(nullptr, nullptr)
+        return iterator(nullptr, nullptr);
     }
-    size_t total_elements = m_start_inex + m_size ;
+    size_t total_elements = m_start_index + m_size ;
     size_t last_block = m_start_block + (total_elements - 1)/ BLOCK_SIZE;
     size_t index_in_last_block = (total_elements - 1)% BLOCK_SIZE; 
 
@@ -993,7 +1066,8 @@ void deque<T>::reallocate_map(size_t new_map_size){
         m_start_index = 0;
     }
     if(m_map){
-        delete[] reinterpret_cast<char*>(m_map);
+        delete[] m_map;
+        m_map = nullptr;
     }
 
     m_map = new_map;
@@ -1034,4 +1108,10 @@ void deque<T>::reallocate_map_for_front(size_t new_map_size) {
     
     m_map = new_map;
     m_map_size = new_map_size;
+}
+
+
+template <class T>
+bool is_range_within_deque(T*begin_ptr, T*end_ptr){
+    //Todo
 }
