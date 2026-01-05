@@ -1169,9 +1169,99 @@ typename deque<T>::iterator deque<T>::erase(typename deque<T>::iterator position
 template<class T>
 typename deque<T>::iterator deque<T>::erase(typename deque<T>::iterator first, 
                 typename deque<T>::iterator last) {
-    // 删除[first, last)范围内的元素
-    // 返回指向last原来位置的迭代器
-    return ...;
+    if (first == last){
+        return last;
+    }
+
+    size_t first_idx = 0;
+    size_t last_idx = 0;
+
+    iterator it = begin();
+    for (;i != first && it !=end(); ++it){
+        ++first_idx;
+    }
+
+    last_idx = first_idx;
+    for( ; it != last && it != end(); ++it){
+        ++last_idx;
+    }
+
+    size_t erase_count = last_idx - first_idx;
+
+    if(erase_count == 0){
+        return last;
+    }
+
+    for (size_t i = first_idx; i < last_idx; ++i){
+        size_t total_pos = m_start_index + i;
+        size_t block = m_start_block + total_pos / BLOCK_SIZE;
+        size_t idx = total_pos % BLOCK_SIZE;
+
+        if(block < m_map_size && m_map[block]){
+            m_map[block][idx].~T();
+        }
+    }
+    size_t elements_before = first_idx;
+    size_t elements_after = m_size -last_idx;
+
+    if (elements_before <= elements_after) {
+        for(size_t dst = last_idx - 1; dst>= first_idx; --dst){
+            for (size_t src = dst - 1; src >= first_idx; --src){
+                if(src >= first_idx + erase_count){
+                size_t src_total = m_start_index + src;
+                size_t dst_total = m_start_index + src + erase_count;
+
+                size_t src_block = m_start_block + src_total / BLOCK_SIZE;
+                size_t src_idx = src_total % BLOCK_SIZE;
+                size_t dst_block = m_start_block + dst_total / BLOCK_SIZE;
+                size_t dst_idx = dst_total % BLOCK_SIZE;
+
+                m_map[dst_block][dst_idx] = std::move(m_map[src_block][src_idx]);
+                }
+            }
+        }
+    m_start_index +=erase_count;
+
+    while (m_start_index >= BLOCK_SIZE) {
+        m_start_index -= BLOCK_SIZE;
+        ++m_start_block;
+        }
+    }
+    else{
+        for(size_t src = last_idx; src < m_size; ++src) {
+            size_t dst = src - erase_count;
+            
+            size_t src_total = m_start_index + src;
+            siez_t dst_total = m_start_index + dst;
+
+            size_t src_block = m_start_block + src_total / BLOCK_SIZE;
+            size_t src_idx = src_total % BLOCK_SIZE;
+            size_t dst_block = m_start_block + dst_total /BLOCK_SIZE;
+            size_t dst_idx = dst_total % BLOCK_SIZE;
+
+            m_map[dst_block][dst_idx] = std:: move(m_map[src_block][src_idx]);
+        }
+        for(size_t i = m_size - erase_count; i < m_size; ++i){
+            size_t total_pos = m_start_index + i;
+            size_t block = m_start_block + total_pos /BLOCK_SIZE;
+            size_t idx = total_pos % BLOCK_SIZE;
+
+            if(block < m_map_size && m_map[block]){
+                m_map[block][idx].~T();
+            }
+        }
+    }
+    m_size -= erase_count;
+    if(first_idx < m_size){
+        size_t new_total = m_start_index + first_idx;
+        size_t new_block = m_start_block + new_total / BLOCK_SIZE;
+        size_t new_idx = new_total % BLOCK_SIZE;
+
+        return iterator(&m_map[new_block], m_map[new_block]+new_idx);
+    }
+    else{
+        return end();
+    }   
 }
 
 template<class T>
@@ -1327,7 +1417,66 @@ void deque<T>::reallocate_map_for_front(size_t new_map_size) {
 
 template <class T>
 bool is_range_within_deque(T*begin_ptr, T*end_ptr){
-    //Todo
+    if (!begin_ptr || !end_ptr||begin_ptr >= end_ptr){
+        return false;
+    }
+
+    if(empty()){
+        return false;
+    }
+
+    size_t range_size = end_ptr - begin_ptr;
+
+    size_t begin_index = SIZE_MAX;
+    size_t end_index = SIZE_MAX;
+
+    T** possible_block = nullptr;
+
+    for(size_t block_idx = 0; block_idx < m_map_size; ++block_idx) {
+        if (m_map[block_idx]) {
+            T* block_begin = m_map[block_idx];
+            T* block_end = block_begin + BLOCK_SIZE;
+
+            if(begin_ptr >= block_begin && begin_ptr < block_end) {
+                possible_block = &m_map[block_idx];
+
+                size_t offset = begin_ptr - block_begin;
+
+                for( size_t i = 0; i < m_size; ++i){
+                    size_t total_pos = m_start_index + i;
+                    size_t actual_block_idx = m_start_block + total_pos /BLOCK_SIZE;
+                    size_t actual_offset = total_pos % BLOCK_SIZE;
+
+                    if(actual_block_idx == block_idx && actual_offset == offset) {
+                        begin_index = i;
+                        break;
+                    }
+                }
+            break;
+            }
+        }
+    }
+    if(begin_index == SIZE_MAX){
+        return false;
+    }
+    for(size_t i = 0; i < range_size; ++i){
+        size_t current_index = begin_index +i;
+
+        if(current_index >= m_size) {
+            return false;
+        }
+        size_t total_pos = m_start_index + current_index;
+        size_t block_idx = m_start_block + total_pos / BLOCK_SIZE;
+        size_t offset = total_pos % BLOCK_SIZE;
+
+        T* expected_ptr = m_map[block_idx]+ offset;
+        T* actual_ptr = begin_ptr + i;
+
+        if(expected_ptr != actual_ptr){
+            return false;
+        } 
+    }
+    return true;
 }
 
 template<class T>
