@@ -28,6 +28,10 @@ public:
     deque (const size_t n, const T& val);
     deque (const deque<T>& other);
 
+    //迭代器
+    class iterator;
+    class const_iterator;
+
     //移动构造
     deque(deque<T>&& other) noexcept;
 
@@ -58,13 +62,15 @@ public:
     bool empty() const { return m_size == 0;};
     size_t size () const {return m_size;};
     size_t max_size() const {return size_t(-1);};
-    void resize (size_t size );
-    void resize (size_t num, size_t elem);
+    void resize (size_t new_size );
+    void resize (size_t new_size, const T& val);
 
     //插入和删除
-    void insert( T* insert_begin_ptr , const T& val);
-    T* erase(T* erase_ptr );
-    T* erase(T* erase_begin_ptr, T* erase_end_ptr);
+    iterator insert( iterator position , const T& val);
+
+
+    iterator erase(iterator pos );
+    iterator erase(iterator erase_begin_ptr, iterator erase_end_ptr);
     void clear();
 
     //数据存取
@@ -78,9 +84,8 @@ public:
     T& front();
     T& back();
 
-    //迭代器
-    class iterator;
-    class const_iterator;
+    
+    
 
     iterator begin();
     const_iterator begin() const;
@@ -108,6 +113,8 @@ private:
     //在pos位置之前或之后移动元素
     void move_elements_forward(iterator pos, size_t n);
     void move_elements_backward(iterator pos, size_t n);
+
+    void ensure_capacity_at_back(size_t n);
     
 };
 
@@ -961,6 +968,213 @@ void deque<T>::pop_front(){
 }
 
 template<class T>
+void deque<T>::resize (size_t new_size ){
+    if(new_size == m_size){
+        return;
+    }
+    //缩小的情况
+    if(new_size < m_size){
+        size_t elements_to_destroy = m_size - new_size;
+
+        for(size_t i = 0; i < elements_to_destroy; ++i){
+
+            size_t pos = m_size - 1 - i;
+            size_t total_pos = m_start_index + pos;
+            size_t block_idx = m_start_block + total_pos / BLOCK_SIZE;
+            size_t elem_idx = total_pos % BLOCK_SIZE;
+
+            if(block_idx < m_map_size && m_map[block_idx] != nullptr){
+                m_map[block_idx][elem_idx].~T();
+            }
+        }
+        m_size = new_size;
+    }
+
+    //扩大的情况
+    else{
+        size_t elements_to_add = new_size - m_size;
+
+        ensure_capacity_at_back(elements_to_add);
+
+        for(size_t i = 0; i < elements_to_add; ++i){
+
+            size_t insert_pos = m_start_index + m_size + i;
+            size_t block_idx = m_start_block + insert_pos / BLOCK_SIZE;
+            size_t elem_idx = inset_pos % BLOCK_SIZE;
+
+            if(m_map[block_idx] == nullptr){
+                m_map[block_idx] = reinterpret_cast<T*>(new char[BLOCK_SIZE*sizeof(T)]);
+            }
+            new(m_map[block_idx] + elem_idx)T();
+        }
+        m_size = new_size;
+    }
+}
+
+template<class T>
+void deque<T>::resize (size_t new_size, const T& val){
+// 如果新大小等于当前大小
+if (new_size == m_size) {
+    return;
+    }
+// 备份当前大小，用于异常恢复
+size_t old_size = m_size;
+
+// 1. 缩小的情况
+if (new_size < m_size) {
+    
+    size_t elements_to_destroy = m_size - new_size;
+    for (size_t i = 0; i < elements_to_destroy; ++i) {
+        size_t pos = m_size - 1 - i;
+        size_t total_pos = m_start_index + pos;
+        size_t block_idx = m_start_block + total_pos / BLOCK_SIZE;
+        size_t elem_idx = total_pos % BLOCK_SIZE;
+        
+        if (block_idx < m_map_size && m_map[block_idx] != nullptr) {
+            m_map[block_idx][elem_idx].~T();
+            }
+        }
+    m_size = new_size;
+    }
+// 2. 扩大的情况
+else {
+    size_t elements_to_add = new_size - m_size;
+    ensure_back_capacity(elements_to_add);
+    
+    // 在末尾添加新元素，使用提供的val
+    for (size_t i = 0; i < elements_to_add; ++i) {
+        // 计算新元素应该插入的位置
+        size_t insert_pos = m_start_index + m_size + i;
+        size_t block_idx = m_start_block + insert_pos / BLOCK_SIZE;
+        size_t elem_idx = insert_pos % BLOCK_SIZE;
+        
+        if (m_map[block_idx] == nullptr) {
+            m_map[block_idx] = reinterpret_cast<T*>(new char[BLOCK_SIZE * sizeof(T)]);
+            }
+        new (m_map[block_idx] + elem_idx) T(val);
+        }
+    m_size = new_size;
+    }
+}
+
+template<class T>
+typename deque<T>::iterator deque<T>::insert( typename deque<T>::iterator position, const T& val){
+    if (position == nullptr) {
+        push_back(val);
+        return;
+    }
+
+    if (empty()) {
+        push_back(val);
+        return;
+    }
+deque<T> temp;
+iterator it = begin();
+iterator pos_it = end();  // 默认指向end
+
+for (; it != end(); ++it) {
+    if (&(*it) == position) {
+        pos_it = it;
+        break;
+        }
+    }
+
+if (pos_it == end()) {
+    push_back(val);
+    return;
+    }
+
+for (iterator save_it = pos_it; save_it != end(); ++save_it) {
+    temp.push_back(*save_it);
+    }
+
+while (size() > std::distance(begin(), pos_it)) {
+    pop_back();
+    }
+
+push_back(val);
+for (size_t i = 0; i < temp.size(); ++i) {
+    push_back(temp[i]);
+    }   
+}
+
+template<class T>
+typename deque<T>::iterator deque<T>::erase(typename deque<T>::iterator position) {
+    
+    if(position == end()){
+        throw std::out_of_range("deque::erase: cannot erase end() iterator");
+    }
+
+    if(empty()){
+        throw std::out_of_range("deque::erase: deque is empty");
+    }
+
+    if(position == begin()){
+        pop_front();
+        return begin();
+    }
+
+    if(position ==end()-1){
+        pop_back();
+        return end();
+    }
+
+    iterator next_position = position;
+    ++next_position;
+
+    size_t erase_index = 0; 
+    iterator it = begin();
+
+    while(it != position){
+        ++it;
+        ++erase_index;
+    }
+
+    size_t total_pos = m_start_index + erase_index;
+    size_t block_idx = m_start_block + total_pos/BLOCK_SIZE;
+    size_t elem_idx = total_pos % BLOCK_SIZE;
+
+    if(block_idx < m_map_size && m_map[block_idx] != nullptr){
+        m_mpa[block_idx][elem_idx].~T();
+    }
+
+    for (size_t i = erase_index; i < m_size - 1; ++i){
+        size_t src_total = m_start_index + i + 1;
+        size_t dst_total = m_start_index + i;
+
+        size_t src_block = m_start_block + src_total / BLOCK_SIZE;
+        size_t src_idx = src_total % BLOCK_SIZE;
+
+        size_t dst_block = m_start_block + dst_total / BLOCK_SIZE;
+        size_t dst_idx = dst_total % BLOCK_SIZE;
+
+        m_map[dst_block][dst_idx] = std::move(m_map[src_block][src_idx]);
+    }
+
+    size_t last_total = m_start_index + m_size - 1;
+    size_t last_block = m_start_block + last_total / BLOCK_SIZE;
+    size_t last_idx = last_total % BLOCK_SIZE;
+
+    if(last_block < m_map_size && m_map[last_block] != nullptr){
+        m_map[last_block][last_idx].~T();
+    }
+
+    --m_size;
+
+    return next_position;
+}
+
+
+// 范围删除的erase
+template<class T>
+typename deque<T>::iterator deque<T>::erase(typename deque<T>::iterator first, 
+                typename deque<T>::iterator last) {
+    // 删除[first, last)范围内的元素
+    // 返回指向last原来位置的迭代器
+    return ...;
+}
+
+template<class T>
 typename deque<T>::iterator deque<T>::begin(){
     if(empty()){
         return iterator(nullptr, nullptr);
@@ -1114,4 +1328,31 @@ void deque<T>::reallocate_map_for_front(size_t new_map_size) {
 template <class T>
 bool is_range_within_deque(T*begin_ptr, T*end_ptr){
     //Todo
+}
+
+template<class T>
+void deque<T>::ensure_capacity_at_back(size_t n) {
+    if (n == 0) return;
+    
+    // 计算需要多少额外空间
+    size_t current_total = m_start_index + m_size;
+    size_t needed_total = current_total + n;
+    size_t current_last_block = m_start_block + (current_total - 1) / BLOCK_SIZE;
+    size_t needed_last_block = m_start_block + (needed_total - 1) / BLOCK_SIZE;
+    
+    // 如果需要的块超过了当前map大小，需要扩展map
+    if (needed_last_block >= m_map_size) {
+        size_t new_map_size = m_map_size;
+        while (needed_last_block >= new_map_size) {
+            new_map_size *= 2;
+        }
+        reallocate_map(new_map_size);
+    }
+    
+    // 确保所有需要的块都已分配
+    for (size_t i = current_last_block + 1; i <= needed_last_block; ++i) {
+        if (i < m_map_size && m_map[i] == nullptr) {
+            m_map[i] = allocate_block();
+        }
+    }
 }
