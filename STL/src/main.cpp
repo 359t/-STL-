@@ -77,8 +77,102 @@ void deque_Test()
         cout<<*it<<" ";
     }
     cout<<endl;
+    
+    deque<int> d3;
+    d3 = d2;
+    cout<< "-------------------------------------------"<<endl; 
+    cout<< "头部删除元素后d3中包含的元素为："<<endl; 
+    for( deque<int>::iterator it = d3.begin(); it < d3.end(); it++)
+    {
+        cout<<*it<<" ";
+    }
+    cout<<endl;
+
+    deque<int> d4;
+    d4 = {1,2,3};
+    cout<< "-------------------------------------------"<<endl; 
+    cout<< "d4中包含的元素为："<<endl; 
+    for( deque<int>::iterator it = d4.begin(); it < d4.end(); it++)
+    {
+        cout<<*it<<" ";
+    }
+    cout<<endl;
+
+    d4.clear();
+    cout<< "-------------------------------------------"<<endl; 
+    cout<< "d4中包含的元素为："<<endl; 
+    for( deque<int>::iterator it = d4.begin(); it < d4.end(); it++)
+    {
+        cout<<*it<<" ";
+    }
+    cout<<endl;
+
+    d4.assign(10,20);
+    cout<< "-------------------------------------------"<<endl; 
+    cout<< "d4中包含的元素为："<<endl; 
+    for( deque<int>::iterator it = d4.begin(); it < d4.end(); it++)
+    {
+        cout<<*it<<" ";
+    }
+    cout<<endl;
+   
+    cout<< "-------------------------------------------"<<endl; 
+    cout<< "d4的大小为："<<d4.size()<<endl;
+    d4.empty();
+    cout<< "d4.empty()后的大小为："<<d4.size()<<endl; 
+    d4.resize(100,10);
+    cout<<"d4.resize()后的大小为："<< d4.size()<<endl;
+    cout<<endl;
+
+    d3.insert(d3.begin()+1,99);
+    cout<< "-------------------------------------------"<<endl; 
+    cout<< "insert后d3中包含的元素为："<<endl; 
+    for( deque<int>::iterator it = d3.begin(); it < d3.end(); it++)
+    {
+        cout<<*it<<" ";
+    }
+    cout<<endl;
+
+    d3.erase(d3.begin()+1);
+    cout<< "-------------------------------------------"<<endl; 
+    cout<< "erase后d3中包含的元素为："<<endl; 
+    for( deque<int>::iterator it = d3.begin(); it < d3.end(); it++)
+    {
+        cout<<*it<<" ";
+    }
+    cout<<endl;
+
+    d3.clear();
+    cout<< "-------------------------------------------"<<endl; 
+    cout<< "clear后d3中包含的元素为："<<endl; 
+    for( deque<int>::iterator it = d3.begin(); it < d3.end(); it++)
+    {
+        cout<<*it<<" ";
+    }
+    cout<<endl;
+
+    deque<int> d7(10,10);
+    for( int i = 0; i < 10;i++){
+        d7[i] = 100+i;
+    }
+    cout<< "-------------------------------------------"<<endl; 
+    cout<< "d7中包含的元素为："<<endl; 
+    for( deque<int>::iterator it = d7.begin(); it < d7.end(); it++)
+    {
+        cout<<*it<<" ";
+    }
+    cout<<endl;
+
+    cout<< "-------------------------------------------"<<endl; 
+    cout << " d7中第一个元素为"<<d7.at(0)<<endl;
+    cout << " d7中第front个元素为"<<d7.front()<<endl;
+    cout << " d7中第back个元素为"<<d7.back()<<endl;
+    cout<<endl;
+
+
 
 }
+
 void test03()
 {
  

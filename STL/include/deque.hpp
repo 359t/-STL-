@@ -751,6 +751,20 @@ deque<T>& deque<T>::operator =(std::initializer_list<T> init){
     return *this;
 }
 
+template<class T>
+deque<T>& deque<T>::operator=(const deque<T>& other) {
+    if (this == &other) {
+        return *this;
+    }
+    
+    // 使用拷贝构造函数创建临时副本
+    deque<T> temp(other);
+    
+    // 交换当前对象和临时对象
+    swap(temp);
+    
+    return *this;
+}
 
 template<class T>
 deque<T>& deque<T>::operator=(deque<T>&& other)noexcept{
@@ -971,45 +985,6 @@ void deque<T>::pop_back(){
     }
 }
 
-// template<class T>
-// void deque<T>:: push_front( const T&val){
-//     if(m_size == 0) {
-//         if(m_map == nullptr) {
-//             allocate_map(MAP_INIT_SIZE);
-//             m_start_block = m_map_size * 3/4;
-//             m_start_index = BLOCK_SIZE / 2;
-//         }else if (m_map[m_start_block] == nullptr){
-//             m_map[m_start_block] = reinterpret_cast<T*>(
-//                 new char[BLOCK_SIZE * sizeof(T)]);
-//         }
-//         new (m_map[m_start_block] + m_start_index) T(std::forward<Args>(args)...);
-//         m_size = 1;
-//         return;
-//     }
-
-//     if (m_start_index > 0) {
-//         m_start_index--;
-//         new(m_map[m_start_block] + m_start_index) T(std::forward<Args>(args)...);
-//     }
-//     else{
-//         if (m_start_block ==0){
-//             size_t new_size = m_map_size * 2;
-//             while (new_size = m_map_size + 4){
-//                 new_size *= 2;
-//             }
-//             reallocate_map_for_front(new_size);
-//         }
-//         m_start_block--;
-
-//         if (m_map[m_start_block]  ==nullptr) {
-//             m_map[m_start_block] = reinterpret_cast<T*>(new char[BLOCK_SIZE * sizeof(T)]);
-//         }
-//         m_start_index = BLOCK_SIZE - 1;
-//         new(m_map[m_start_block] + m_start_index) T(std::forward<Args>(args)...);
-//     }
-//     m_size++;
-// }
-
 template <class T>
 void deque<T>:: push_front(T&& val){
 
@@ -1046,6 +1021,54 @@ void deque<T>:: push_front(T&& val){
 
     --m_start_index;
     m_map[m_start_block][m_start_index] = std::move(val);
+    ++m_size;
+}
+
+template<class T>
+void deque<T>::push_front(const T& value) {
+    // 如果 deque 为空，需要初始化
+    if (empty()) {
+        if (m_map == nullptr) {
+            // 分配 map
+            m_map_size = MAP_INIT_SIZE;  // 初始大小，例如 8
+            m_map = new T*[m_map_size];
+            for (size_t i = 0; i < m_map_size; ++i) {
+                m_map[i] = nullptr;
+            }
+            m_start_block = m_map_size / 2;  // 从中间开始
+            m_start_index = BLOCK_SIZE / 2;  // 从块中间开始
+        }
+        
+        // 分配起始块
+        if (m_map[m_start_block] == nullptr) {
+            m_map[m_start_block] = reinterpret_cast<T*>(new char[BLOCK_SIZE * sizeof(T)]);
+        }
+        
+        // 在起始位置构造元素
+        new (&m_map[m_start_block][m_start_index]) T(value);
+        ++m_size;
+        return;
+    }
+    
+    // 检查是否需要扩展空间
+    if (m_start_index == 0) {
+        // 需要在前面的块分配空间
+        size_t new_block = (m_start_block == 0) ? m_map_size - 1 : m_start_block - 1;
+        
+        // 如果 map 满了，需要重新分配更大的 map
+        if (m_map[new_block] == nullptr) {
+            // 分配新块
+            m_map[new_block] = reinterpret_cast<T*>(new char[BLOCK_SIZE * sizeof(T)]);
+        }
+        
+        m_start_block = new_block;
+        m_start_index = BLOCK_SIZE - 1;
+    } else {
+        --m_start_index;
+    }
+    
+    // 在起始位置构造新元素
+    new (&m_map[m_start_block][m_start_index]) T(value);
     ++m_size;
 }
 
@@ -1171,44 +1194,40 @@ else {
 }
 
 template<class T>
-typename deque<T>::iterator deque<T>::insert( typename deque<T>::iterator position, const T& val){
-    if (position == nullptr) {
+typename deque<T>::iterator deque<T>::insert(typename deque<T>::iterator position, const T& val) {
+    // 如果 deque 为空或 position 是 end()
+    if (empty() || position == end()) {
         push_back(val);
-        return end() - 1;
+        return empty() ? begin() : --end();
     }
-
-    if (empty()) {
-        push_back(val);
+    
+    // 如果 position 是 begin()
+    if (position == begin()) {
+        push_front(val);
         return begin();
     }
-deque<T> temp;
-iterator it = begin();
-iterator pos_it = end();  // 默认指向end
-
-for (; it != end(); ++it) {
-    if (&(*it) == position) {
-        pos_it = it;
-        break;
-        }
+    
+    // 在中间插入
+    // 1. 先计算插入位置
+    size_t insert_index = 0;
+    iterator it = begin();
+    for (; it != position && it != end(); ++it) {
+        ++insert_index;
     }
-
-if (pos_it == end()) {
-    push_back(val);
-    return end() - 1;
+    
+    // 2. 在末尾添加一个元素（为移动元素腾出空间）
+    push_back(val);  // 添加一个默认值
+    
+    // 3. 从插入点到末尾的元素向后移动一位
+    for (size_t i = size() - 1; i > insert_index; --i) {
+        (*this)[i] = (*this)[i - 1];
     }
-
-for (iterator save_it = pos_it; save_it != end(); ++save_it) {
-    temp.push_back(*save_it);
-    }
-
-while (size() > std::distance(begin(), pos_it)) {
-    pop_back();
-    }
-
-push_back(val);
-for (size_t i = 0; i < temp.size(); ++i) {
-    push_back(temp[i]);
-    }   
+    
+    // 4. 在插入位置放入新值
+    (*this)[insert_index] = val;
+    
+    // 5. 返回指向新插入元素的迭代器
+    return begin() + insert_index;
 }
 
 template<class T>
@@ -1461,26 +1480,28 @@ T& deque<T>::at(size_t index){
 }
 
 template<class T>
-const T& deque<T>::front() const{
-    if(empty()) {
+const T& deque<T>::front() const {
+    if (empty()) {
         throw std::out_of_range("deque::front: deque is empty");
     }
+    
 #ifdef _DEBUG
-    if(m_start_block >= m_map_size) {
-        throw std::logic_error("deque:;front: invalid start block");
+    if (m_start_block >= m_map_size) {
+        throw std::logic_error("deque::front: invalid start block");
     }
-
-    T*block = m_map[m_start_block];
-    if (block == nullptr){
+    
+    T* block = m_map[m_start_block];
+    if (block == nullptr) {
         throw std::logic_error("deque::front: start block not allocated");
     }
-
-    if(m_start_index >= BLOCK_SIZE) {
+    
+    if (m_start_index >= BLOCK_SIZE) {
         throw std::logic_error("deque::front: invalid start index");
     }
 #endif
-
-    return const_cast<T&>(static_cast<const deque<T>&>(*this).front());
+    
+    // 直接返回元素，而不是再次调用 front()
+    return m_map[m_start_block][m_start_index];
 }
 
 template<class T>
@@ -1490,26 +1511,33 @@ T& deque<T>::front() {
 }
 
 template<class T>
-const T& deque<T>::back() const{
-
-    if(empty()){
+const T& deque<T>::back() const {
+    if (empty()) {
         throw std::out_of_range("deque::back: deque is empty");
     }
-
-    size_t last_total = m_start_index + m_size -1;
-    size_t last_block = m_start_block + last_total /BLOCK_SIZE;
+    
+    // 计算最后一个元素的相对位置
+    size_t last_total = m_start_index + m_size - 1;
+    size_t last_block = m_start_block + (last_total / BLOCK_SIZE);
     size_t last_idx = last_total % BLOCK_SIZE;
-
+    
+    // 关键：处理循环
+    if (last_block >= m_map_size) {
+        last_block %= m_map_size;  // 循环回到开头
+    }
+    
+    // 调试检查
 #ifdef _DEBUG
     if (last_block >= m_map_size) {
         throw std::logic_error("deque::back: invalid block index");
     }
-
+    
     T* block = m_map[last_block];
     if (block == nullptr) {
         throw std::logic_error("deque::back: invalid element index");
     }
 #endif
+    
     return m_map[last_block][last_idx];
 }
 
