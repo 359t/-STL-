@@ -29,7 +29,7 @@ public:
     class const_iterator;
 
     //构造
-    deque () = default;
+    deque () : m_map(nullptr), m_map_size(0), m_start_block(0), m_start_index(0), m_size(0) {}
     deque (const size_t n, const T& val);
     deque (const deque<T>& other);
 
@@ -770,20 +770,22 @@ template<class T>
 deque<T>& deque<T>::operator=(deque<T>&& other)noexcept{
     if (this != &other) {
         clear();
-    }
-    if(m_map) {
-        delete[] reinterpret_cast<char*>(m_map);
-    }
-    m_map = other.m_map;
-    m_map_size = other.m_map_size;
-    m_start_index = other.m_start_index;
-    m_size = other.m_size;
+        if(m_map) {
+            delete[] reinterpret_cast<char*>(m_map);
+        }
+        m_map = other.m_map;
+        m_map_size = other.m_map_size;
+        m_start_block = other.m_start_block;
+        m_start_index = other.m_start_index;
+        m_size = other.m_size;
 
-    other.m_map = nullptr;
-    other.m_map_size = 0;
-    other.m_start_block = 0;
-    other.m_start_index = 0;
-    other.m_size = 0;
+        other.m_map = nullptr;
+        other.m_map_size = 0;
+        other.m_start_block = 0;
+        other.m_start_index = 0;
+        other.m_size = 0;
+    }
+    return *this;
 }
 
 template<class T>
@@ -910,6 +912,11 @@ void deque<T>::push_back(const T&val){
 template <class T>
 void deque<T>::push_back(T&& val) {
     if (empty()) {
+        if (m_map == nullptr) {
+            allocate_map(MAP_INIT_SIZE);
+            m_start_block = m_map_size / 2;
+            m_start_index = 0;
+        }
         // 确保起始块已分配
         if (m_map[m_start_block] == nullptr) {
             m_map[m_start_block] = reinterpret_cast<T*>(
@@ -1030,11 +1037,7 @@ void deque<T>::push_front(const T& value) {
     if (empty()) {
         if (m_map == nullptr) {
             // 分配 map
-            m_map_size = MAP_INIT_SIZE;  // 初始大小，例如 8
-            m_map = new T*[m_map_size];
-            for (size_t i = 0; i < m_map_size; ++i) {
-                m_map[i] = nullptr;
-            }
+            allocate_map(MAP_INIT_SIZE);
             m_start_block = m_map_size / 2;  // 从中间开始
             m_start_index = BLOCK_SIZE / 2;  // 从块中间开始
         }

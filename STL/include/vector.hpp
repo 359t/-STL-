@@ -15,8 +15,8 @@ public:
 
     //构造
     vector ()=default;
-    explicit vector (size_t n);  //n
-    explicit vector (size_t n, const T& val = T());  //（容量，数据类型）
+    explicit vector (size_t n);  //n elements default-initialized
+    explicit vector (size_t n, const T& val);  //n elements initialized to val
     
 
     //拷贝构造
@@ -69,14 +69,16 @@ public:
 };
 
 
-//构造
+//构造 - n elements default-initialized
 template <typename T>
 vector<T>::vector (size_t n):
  m_data(static_cast<T*>(::operator new(n * sizeof(T)))), 
- m_size(0), 
+ m_size(n), 
  m_capacity(n) 
 {
-    //无实现
+    for (size_t i = 0; i < n; ++i) {
+        new (m_data + i) T(); 
+    }
 }
 
 //有参构造
@@ -103,10 +105,14 @@ vector<T>::vector (const vector & other)
         new(m_data + i) T(other.m_data[i]);
     }
 }
-//析构函数(待验证)
+//析构函数
 template<class T>
 vector <T>::~vector()
 {
+    // 调用每个元素的析构函数
+    for (size_t i = 0; i < m_size; ++i) {
+        m_data[i].~T();
+    }
     ::operator delete(m_data);
     m_data = nullptr;
     m_size = 0;
